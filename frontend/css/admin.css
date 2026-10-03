@@ -1,9 +1,9 @@
 :root {
-  --primary: #0d6efd;
-  --primary-dark: #0a4ea3;
-  --text: #1d2736;
-  --muted: #667085;
-  --border: #dfe5ec;
+  --primary: #176b4b;
+  --primary-dark: #104b37;
+  --text: #1d2d25;
+  --muted: #64736b;
+  --border: #dce5de;
   --surface: #ffffff;
   --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
   --danger: #dc2626;
@@ -13,7 +13,7 @@
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
-  background: #f6f9fc;
+  background: #f8faf8;
   color: var(--text);
 }
 
@@ -45,23 +45,34 @@ button, input, textarea { font: inherit; }
 }
 
 .brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
+  flex: 0 0 auto;
   width: 42px;
   height: 42px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #0d6efd, #3b82f6);
-  color: white;
-  font-size: 0.8rem;
+  border-radius: 0;
+  background: none;
 }
+
+.brand-copy { display: flex; flex-direction: column; }
+.brand .brand-name { color: var(--primary-dark); font-size: 1rem; font-weight: 850; letter-spacing: .12em; line-height: 1.15; }
+.brand-tagline { margin-top: 3px; color: var(--muted); font-size: .72rem; font-weight: 600; }
 
 .main-nav {
   display: flex;
+  align-items: center;
   gap: 20px;
   color: var(--muted);
   font-weight: 600;
 }
+
+.main-nav a { padding: 8px 11px; border-radius: 9px; }
+.main-nav a:hover { background: #edf4ee; color: var(--primary-dark); }
+.nav-toggle { display: none; width: 42px; height: 42px; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 11px; background: #fff; color: var(--primary-dark); }
+.menu-lines, .menu-lines::before, .menu-lines::after { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; }
+.menu-lines { position: relative; }
+.menu-lines::before, .menu-lines::after { position: absolute; left: 0; content: ""; }
+.menu-lines::before { top: -6px; }
+.menu-lines::after { top: 6px; }
 
 .admin-page {
   padding: 48px 0 80px;
@@ -129,12 +140,12 @@ button, input, textarea { font: inherit; }
 }
 
 .primary-btn {
-  background: linear-gradient(135deg, var(--primary), #2563eb);
+  background: var(--primary);
   color: white;
 }
 
 .secondary-btn {
-  background: #ecf3ff;
+  background: #e9f3ec;
   color: var(--primary-dark);
 }
 
@@ -228,7 +239,23 @@ th {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+  .nav-wrap { position: relative; }
+  .nav-toggle { display: inline-flex; }
   .main-nav {
     display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 25;
+    min-width: 200px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: var(--shadow);
   }
+  .main-nav.open { display: flex; }
 }

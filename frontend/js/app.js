@@ -9,13 +9,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   const resultsBox = document.getElementById('stationResults');
   const popularStationsBox = document.getElementById('popularStations');
   const useLocationBtn = document.getElementById('useLocationBtn');
+  const swapLocationsBtn = document.getElementById('swapLocationsBtn');
+  const journeySection = document.getElementById('journeySection');
+  const searchHint = document.getElementById('searchHint');
+  const routeMapPanel = document.getElementById('routeMapPanel');
+  const navToggle = document.querySelector('.nav-toggle');
+  const mainNav = document.getElementById('mainNav');
 
   const state = {
     allStations: [],
     currentMap: null,
     currentMarkers: [],
-    routePath: null,
+    routePaths: [],
+    searchId: 0,
+    lastResult: null,
   };
+
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+
+  const hasCoordinates = (place) =>
+    place?.latitude !== null && place?.latitude !== undefined &&
+    place?.longitude !== null && place?.longitude !== undefined &&
+    Number.isFinite(Number(place.latitude)) && Number.isFinite(Number(place.longitude));
 
   function setStatus(message, type = 'info') {
     if (!routeStatus) return;
@@ -27,34 +48,89 @@ document.addEventListener('DOMContentLoaded', async () => {
     const normalized = String(query || '').trim().toLowerCase();
     if (!normalized) return [];
 
-    const values = new Set();
-    state.allStations.forEach((station) => {
-      const entries = [
+    const directMatches = state.allStations.filter((station) =>
+      [station.name, station.address].filter(Boolean).join(' ').toLowerCase().includes(normalized)
+    );
+    const matches = directMatches.length ? directMatches : state.allStations.filter((station) => {
+      const searchText = [
         station.name,
         station.address,
-        station.address.split(',')[0],
         ...(station.destinations || []),
         ...(station.routes || []).flatMap((route) => [route.name, route.origin, route.destination]),
-      ];
-
-      entries.forEach((entry) => {
-        if (entry && entry.toLowerCase().includes(normalized)) {
-          values.add(entry.trim());
-        }
-      });
+      ].filter(Boolean).join(' ').toLowerCase();
+      return searchText.includes(normalized);
     });
 
-    return [...values].slice(0, 8);
+    return [...new Map(matches.map((station) => [station.name, {
+      name: station.name,
+      detail: station.address || (station.transport_types || []).join(' · ') || 'Transport station',
+    }])).values()].slice(0, 6);
   }
 
-  function syncSuggestions() {
-    if (!fromSuggestions || !toSuggestions) return;
+  function closeSuggestions(input, suggestions) {
+    if (!input || !suggestions) return;
+    suggestions.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+  }
 
-    const fromOptions = buildSuggestions(fromInput.value);
-    const toOptions = buildSuggestions(toInput.value);
+  function renderSuggestions(input, suggestions) {
+    if (!input || !suggestions) return;
+    const options = buildSuggestions(input.value);
+    suggestions.innerHTML = options.map((option, index) => `
+      <button class="suggestion-option" type="button" role="option" id="${input.id}-option-${index}" data-value="${escapeHtml(option.name)}" aria-selected="false">
+        <span class="suggestion-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <span class="suggestion-copy"><span class="suggestion-name">${escapeHtml(option.name)}</span><span class="suggestion-meta">${escapeHtml(option.detail)}</span></span>
+      </button>
+    `).join('');
+    suggestions.hidden = options.length === 0;
+    input.setAttribute('aria-expanded', String(options.length > 0));
+    input.removeAttribute('aria-activedescendant');
+  }
 
-    fromSuggestions.innerHTML = fromOptions.map((value) => `<option value="${value}"></option>`).join('');
-    toSuggestions.innerHTML = toOptions.map((value) => `<option value="${value}"></option>`).join('');
+  function selectSuggestion(input, suggestions, option) {
+    if (!option) return;
+    input.value = option.dataset.value;
+    closeSuggestions(input, suggestions);
+    input.focus();
+  }
+
+  function moveSuggestionSelection(input, suggestions, direction) {
+    const options = [...suggestions.querySelectorAll('[role="option"]')];
+    if (!options.length) return;
+    const selectedIndex = options.findIndex((option) => option.getAttribute('aria-selected') === 'true');
+    const nextIndex = selectedIndex < 0
+      ? (direction > 0 ? 0 : options.length - 1)
+      : (selectedIndex + direction + options.length) % options.length;
+    options.forEach((option, index) => option.setAttribute('aria-selected', String(index === nextIndex)));
+    input.setAttribute('aria-activedescendant', options[nextIndex].id);
+  }
+
+  function connectAutocomplete(input, suggestions) {
+    if (!input || !suggestions) return;
+    input.addEventListener('input', () => renderSuggestions(input, suggestions));
+    input.addEventListener('focus', () => renderSuggestions(input, suggestions));
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (suggestions.hidden) renderSuggestions(input, suggestions);
+        moveSuggestionSelection(input, suggestions, event.key === 'ArrowDown' ? 1 : -1);
+      } else if (event.key === 'Enter' && !suggestions.hidden) {
+        const activeOption = suggestions.querySelector('[aria-selected="true"]');
+        if (activeOption) {
+          event.preventDefault();
+          selectSuggestion(input, suggestions, activeOption);
+        }
+      } else if (event.key === 'Escape') {
+        closeSuggestions(input, suggestions);
+      }
+    });
+    input.addEventListener('blur', () => window.setTimeout(() => closeSuggestions(input, suggestions), 120));
+    suggestions.addEventListener('pointerdown', (event) => event.preventDefault());
+    suggestions.addEventListener('click', (event) => {
+      const option = event.target.closest('[role="option"]');
+      if (option) selectSuggestion(input, suggestions, option);
+    });
   }
 
   function renderPopularStations(stations) {
@@ -63,15 +139,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const top = stations.slice(0, 6);
     popularStationsBox.innerHTML = top.map((station) => `
       <article class="popular-card">
-        <h3>${station.name}</h3>
-        <div class="station-info">${station.address}</div>
+        <h3>${escapeHtml(station.name)}</h3>
+        <div class="station-info">${escapeHtml(station.address || 'Addis Ababa')}</div>
         <div class="chip-row">
-          ${(station.transport_types || []).slice(0, 3).map((type) => `<span class="chip">${type}</span>`).join('')}
-          ${(station.routes || []).slice(0, 2).map((route) => `<span class="chip">${route.name}</span>`).join('')}
+          ${(station.transport_types || []).slice(0, 3).map((type) => `<span class="chip">${escapeHtml(type)}</span>`).join('')}
+          ${(station.routes || []).slice(0, 2).map((route) => `<span class="chip">${escapeHtml(route.name)}</span>`).join('')}
         </div>
         <div class="result-footer">
-          <a href="/station.html?id=${station.id}">View details</a>
-          <a href="https://www.google.com/maps/search/?api=1&query=${station.latitude},${station.longitude}" target="_blank" rel="noreferrer">Directions</a>
+          <a href="/station.html?id=${encodeURIComponent(station.id)}">View details</a>
+          ${hasCoordinates(station) ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.latitude},${station.longitude}`)}" target="_blank" rel="noreferrer">Directions</a>` : ''}
         </div>
       </article>
     `).join('');
@@ -83,67 +159,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!data || !data.routes || !data.routes.length) {
       routeResult.innerHTML = `
         <div class="route-empty">
-          <h3>We don't have enough route information for this journey yet.</h3>
-          <p>FERMATA can only recommend routes that match the station and route data available in the app.</p>
+          <div class="empty-route-illustration" aria-hidden="true">
+            <svg viewBox="0 0 64 64"><circle cx="28" cy="28" r="17"/><path d="m41 41 12 12M21 28h14m-7-7v14"/></svg>
+          </div>
+          <h3>No route found</h3>
+          <p>We couldn’t find a transport route between <strong>${escapeHtml(fromInput.value || data?.from?.label || 'these locations')}</strong> and <strong>${escapeHtml(toInput.value || data?.to?.label || 'your destination')}</strong>. Try another station or destination.</p>
         </div>
       `;
       return;
     }
 
-    const firstRoute = data.routes[0];
     routeResult.innerHTML = `
       <div class="journey-summary">
-        <h2>Route from ${data.from.label} to ${data.to.label}</h2>
-        <div class="journey-steps">
+        <h2>Your journey</h2>
+        <div class="journey-endpoints">
           <div class="journey-step">
             <span class="step-dot start"></span>
             <div>
               <strong>Starting point</strong>
-              <p>${data.from.label}</p>
+              <p>${escapeHtml(data.from?.label || 'Starting location')}</p>
             </div>
           </div>
-
-          <div class="journey-step">
-            <span class="step-dot station"></span>
-            <div>
-              <strong>Recommended station</strong>
-              <p>${firstRoute.stations[0]?.name || 'Nearby station'}</p>
-            </div>
-          </div>
-
-          <div class="journey-step">
-            <span class="step-dot route"></span>
-            <div>
-              <strong>Transport</strong>
-              <p>${firstRoute.transportType}</p>
-            </div>
-          </div>
-
           <div class="journey-step">
             <span class="step-dot destination"></span>
             <div>
-              <strong>Destination station</strong>
-              <p>${firstRoute.stations[firstRoute.stations.length - 1]?.name || data.to.label}</p>
+              <strong>Destination</strong>
+              <p>${escapeHtml(data.to?.label || 'Destination')}</p>
             </div>
           </div>
         </div>
       </div>
 
       <div class="route-options">
-        ${data.routes.map((option, index) => `
+        ${data.routes.map((option, index) => {
+          const stations = Array.isArray(option.stations) ? option.stations : [];
+          return `
           <article class="route-option">
             <div class="route-option-header">
               <span class="route-badge">Route option ${index + 1}</span>
-              <span class="route-criteria">${option.criteria}</span>
+              <span class="route-criteria">${escapeHtml(option.criteria || 'Recommended')}</span>
             </div>
-            <h3>${option.routeName}</h3>
+            <h3>${escapeHtml(option.routeName || `Route ${index + 1}`)}</h3>
             <div class="route-meta">
-              <span>🚌 ${option.transportType}</span>
-              <span>${option.stations.length} stations</span>
+              <span><svg class="transport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17V6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5V17M5 10h14M7 20v-3m10 3v-3M7.5 17h9"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>${escapeHtml(option.transportType || 'Transport type unavailable')}</span>
+              <span>${stations.length} ${stations.length === 1 ? 'station' : 'stations'}</span>
             </div>
-            <p>${option.summary}</p>
+            ${option.summary ? `<p class="route-summary-text">${escapeHtml(option.summary)}</p>` : ''}
+            ${option.description ? `<p class="route-description">${escapeHtml(option.description)}</p>` : ''}
+            <h4 class="stops-heading">Stations along this route</h4>
+            ${stations.length ? `
+              <ol class="route-stops">
+                ${stations.map((station) => `
+                  <li>
+                    <span class="stop-name">${escapeHtml(station.name || 'Unnamed station')}</span>
+                    ${station.address ? `<span class="stop-address">${escapeHtml(station.address)}</span>` : ''}
+                  </li>
+                `).join('')}
+              </ol>
+            ` : '<p class="route-description">Station details are not available for this route yet.</p>'}
+            <button class="view-route-button" type="button" data-route-index="${index}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              View route on map
+            </button>
           </article>
-        `).join('')}
+        `;
+        }).join('')}
       </div>
     `;
   }
@@ -152,9 +232,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!resultsBox) return;
 
     const matchingStations = (data.routes || []).flatMap((route) =>
-      route.stations.map((station) => ({
+      (route.stations || []).map((station) => ({
         ...station,
         routeName: route.routeName,
+        transportType: route.transportType,
       }))
     );
 
@@ -163,14 +244,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    resultsBox.innerHTML = matchingStations.map((station) => `
+    const uniqueStations = [...new Map(matchingStations.map((station) => [
+      `${station.id ?? ''}:${station.name}:${station.latitude ?? ''}:${station.longitude ?? ''}`,
+      station,
+    ])).values()];
+
+    resultsBox.innerHTML = uniqueStations.map((station) => `
       <article class="result-card">
-        <h3>${station.name}</h3>
-        <div class="result-meta">${station.address}</div>
-        <div class="result-meta">${station.routeName}</div>
+        <h3>${escapeHtml(station.name || 'Unnamed station')}</h3>
+        ${station.address ? `<div class="result-meta">${escapeHtml(station.address)}</div>` : ''}
+        <div class="result-meta">${escapeHtml(station.routeName || 'Route')} · ${escapeHtml(station.transportType || 'Transport type unavailable')}</div>
         <div class="result-footer">
-          <a href="/station.html?id=${station.id}">View details</a>
-          <a href="https://www.google.com/maps/search/?api=1&query=${station.latitude},${station.longitude}" target="_blank" rel="noreferrer">Directions</a>
+          ${station.id != null ? `<a href="/station.html?id=${encodeURIComponent(station.id)}">View details</a>` : ''}
+          ${hasCoordinates(station) ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.latitude},${station.longitude}`)}" target="_blank" rel="noreferrer">Directions</a>` : ''}
         </div>
       </article>
     `).join('');
@@ -182,64 +268,102 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.currentMarkers.forEach((marker) => state.currentMap.removeLayer(marker));
     state.currentMarkers = [];
 
-    if (state.routePath) {
-      state.currentMap.removeLayer(state.routePath);
-      state.routePath = null;
-    }
+    state.routePaths.forEach((path) => state.currentMap.removeLayer(path));
+    state.routePaths = [];
   }
 
   function renderRouteMap(data) {
     if (!state.currentMap) return;
 
     clearMapLayers();
+    routeMapPanel.hidden = !data?.routes?.length;
+    if (routeMapPanel.hidden) return;
 
     const pathPoints = [];
 
-    if (data.from.latitude && data.from.longitude) {
+    if (hasCoordinates(data.from)) {
       const startMarker = L.circleMarker([data.from.latitude, data.from.longitude], {
         radius: 9,
         color: '#22c55e',
         fillColor: '#22c55e',
         fillOpacity: 0.95,
       }).addTo(state.currentMap);
-      startMarker.bindPopup(`<div><strong>Starting point</strong><br/>${data.from.label}</div>`);
+      startMarker.bindPopup(`<div><strong>Starting point</strong><br/>${escapeHtml(data.from.label)}</div>`);
       state.currentMarkers.push(startMarker);
       pathPoints.push([data.from.latitude, data.from.longitude]);
     }
 
-    const routeStations = data.routes?.[0]?.stations || [];
-    routeStations.forEach((station) => {
-      const marker = window.transportMap.addStationMarker(state.currentMap, station, {
-        color: '#2563eb',
-        popupTitle: station.name,
+    const routeColors = ['#176b4b', '#4b8d62', '#78a77d', '#32775a'];
+    const plottedStations = new Set();
+    const originKey = hasCoordinates(data.from) ? `${Number(data.from.latitude)},${Number(data.from.longitude)}` : null;
+    const destinationKey = hasCoordinates(data.to) ? `${Number(data.to.latitude)},${Number(data.to.longitude)}` : null;
+    (data.routes || []).forEach((route, index) => {
+      const routeStations = (route.stations || []).filter(hasCoordinates);
+      const linePoints = [];
+
+      if (hasCoordinates(data.from)) linePoints.push([Number(data.from.latitude), Number(data.from.longitude)]);
+      routeStations.forEach((station) => {
+        const coordinates = [Number(station.latitude), Number(station.longitude)];
+        linePoints.push(coordinates);
+        pathPoints.push(coordinates);
+        const key = `${station.id ?? ''}:${coordinates.join(',')}`;
+        const isEndpoint = coordinates.join(',') === originKey || coordinates.join(',') === destinationKey;
+        if (!isEndpoint && !plottedStations.has(key)) {
+          plottedStations.add(key);
+          const marker = window.transportMap.addStationMarker(state.currentMap, station, {
+            color: routeColors[index % routeColors.length],
+            popupTitle: station.name,
+          });
+          state.currentMarkers.push(marker);
+        }
       });
-      state.currentMarkers.push(marker);
-      pathPoints.push([station.latitude, station.longitude]);
+      if (hasCoordinates(data.to)) linePoints.push([Number(data.to.latitude), Number(data.to.longitude)]);
+      if (linePoints.length > 1) {
+        const routePath = window.transportMap.addRoutePath(
+          state.currentMap,
+          linePoints,
+          routeColors[index % routeColors.length]
+        );
+        if (routePath) state.routePaths.push(routePath);
+      }
     });
 
-    if (data.to.latitude && data.to.longitude) {
+    if (hasCoordinates(data.to)) {
       const destinationMarker = L.circleMarker([data.to.latitude, data.to.longitude], {
         radius: 9,
         color: '#ef4444',
         fillColor: '#ef4444',
         fillOpacity: 0.9,
       }).addTo(state.currentMap);
-      destinationMarker.bindPopup(`<div><strong>Destination</strong><br/>${data.to.label}</div>`);
+      destinationMarker.bindPopup(`<div><strong>Destination</strong><br/>${escapeHtml(data.to.label)}</div>`);
       state.currentMarkers.push(destinationMarker);
       pathPoints.push([data.to.latitude, data.to.longitude]);
     }
 
-    if (routeStations.length > 1) {
-      state.routePath = window.transportMap.addRoutePath(
-        state.currentMap,
-        routeStations.map((station) => [station.latitude, station.longitude]),
-        '#22c55e'
-      );
-    }
+    window.requestAnimationFrame(() => {
+      state.currentMap.invalidateSize({ pan: false });
+      if (pathPoints.length > 1) {
+        const bounds = L.latLngBounds(pathPoints);
+        state.currentMap.fitBounds(bounds, { padding: [34, 34] });
+      }
+    });
+  }
 
-    if (pathPoints.length > 1) {
-      const bounds = L.latLngBounds(pathPoints);
-      state.currentMap.fitBounds(bounds, { padding: [40, 40] });
+  function focusRouteOnMap(routeIndex) {
+    const route = state.lastResult?.routes?.[routeIndex];
+    if (!route || !state.currentMap || !routeMapPanel || routeMapPanel.hidden) return;
+
+    const points = [];
+    const addPoint = (place) => {
+      if (hasCoordinates(place)) points.push([Number(place.latitude), Number(place.longitude)]);
+    };
+    addPoint(state.lastResult.from);
+    (route.stations || []).forEach(addPoint);
+    addPoint(state.lastResult.to);
+    if (points.length) {
+      state.currentMap.invalidateSize({ pan: false });
+      state.currentMap.fitBounds(L.latLngBounds(points), { padding: [42, 42], maxZoom: 15 });
+      routeMapPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 
@@ -251,24 +375,60 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!from || !to) {
       setStatus('Please add both a starting point and a destination.', 'error');
+      (from ? toInput : fromInput).focus();
       return;
     }
 
+    const searchId = ++state.searchId;
+    const submitButton = routeForm.querySelector('[type="submit"]');
+    const submitLabel = submitButton?.querySelector('span');
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitLabel.textContent = 'Finding route...';
+    }
+    journeySection.hidden = false;
+    searchHint.hidden = true;
+    routeMapPanel.hidden = true;
+    routeResult.innerHTML = '<div class="route-loading" role="status"><span class="loading-mark-wrap" aria-hidden="true"><img src="assets/fermata-mark.svg" alt="" /></span><span>Finding your route…</span></div>';
+    if (resultsBox) resultsBox.innerHTML = '';
+    clearMapLayers();
+
     try {
-      setStatus('Finding the most relevant route...', 'info');
+      setStatus('Searching available routes…', 'info');
       const result = await window.transportApi.searchRoute(from, to);
+      if (searchId !== state.searchId) return;
+      state.lastResult = result;
       renderRouteResult(result);
       renderStationResults(result);
       renderRouteMap(result);
 
       if (result && result.routes && result.routes.length) {
-        setStatus('Route options ready.', 'success');
+        setStatus(`${result.routes.length} ${result.routes.length === 1 ? 'route option' : 'route options'} found.`, 'success');
       } else {
-        setStatus(result?.message || "We don't have enough route information for this journey yet.", 'error');
+        setStatus('No routes found. Try another station or destination.', 'info');
       }
+      journeySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
+      if (searchId !== state.searchId) return;
+      state.lastResult = null;
+      routeResult.innerHTML = `
+        <div class="route-empty route-error" role="alert">
+          <div class="empty-route-illustration" aria-hidden="true">
+            <svg viewBox="0 0 64 64"><circle cx="28" cy="28" r="17"/><path d="m41 41 12 12M21 28h14m-7-7v14"/></svg>
+          </div>
+          <h3>Route search is temporarily unavailable</h3>
+          <p>Please check your connection and try again in a moment.</p>
+        </div>
+      `;
+      routeMapPanel.hidden = true;
       setStatus('Unable to find a route right now. Please try again.', 'error');
       console.error(error);
+      journeySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } finally {
+      if (searchId === state.searchId && submitButton) {
+        submitButton.disabled = false;
+        submitLabel.textContent = 'Find Route';
+      }
     }
   }
 
@@ -276,21 +436,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!document.getElementById('map')) return;
 
     state.currentMap = window.transportMap.buildMap('map');
+    connectAutocomplete(fromInput, fromSuggestions);
+    connectAutocomplete(toInput, toSuggestions);
 
     try {
       const result = await window.transportApi.getStations();
       state.allStations = result.data || [];
       renderPopularStations(state.allStations);
 
-      fromInput.value = 'Bole';
-      toInput.value = 'Piazza';
-      syncSuggestions();
-      handleRouteSearch({ preventDefault() {} });
-
-      fromInput.addEventListener('input', syncSuggestions);
-      toInput.addEventListener('input', syncSuggestions);
     } catch (error) {
-      setStatus('Could not load the route data.', 'error');
+      setStatus('Station suggestions could not be loaded. You can still search by entering both locations.', 'info');
       console.error(error);
     }
   }
@@ -301,41 +456,43 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    const locationLabel = useLocationBtn.querySelector('span');
     useLocationBtn.disabled = true;
-    useLocationBtn.textContent = 'Locating...';
+    locationLabel.textContent = 'Locating...';
 
     navigator.geolocation.getCurrentPosition(async (position) => {
       const { latitude, longitude } = position.coords;
       useLocationBtn.disabled = false;
-      useLocationBtn.textContent = 'Use my location';
+      locationLabel.textContent = 'Use my location';
 
-      const nearest = await window.transportApi.getNearbyStations(latitude, longitude);
-      const firstNearby = nearest.data && nearest.data[0];
+      try {
+        const nearest = await window.transportApi.getNearbyStations(latitude, longitude);
+        const firstNearby = nearest.data && nearest.data[0];
 
-      if (firstNearby) {
-        fromInput.value = firstNearby.name;
-      } else {
-        fromInput.value = 'Current location';
+        fromInput.value = firstNearby ? firstNearby.name : 'Current location';
+
+        if (state.currentMap) {
+          const userMarker = L.circleMarker([latitude, longitude], {
+            radius: 8,
+            color: '#16a34a',
+            fillColor: '#16a34a',
+            fillOpacity: 0.9,
+          }).addTo(state.currentMap);
+          userMarker.bindPopup('<div><strong>Your current location</strong></div>');
+          state.currentMarkers.push(userMarker);
+          state.currentMap.setView([latitude, longitude], 13);
+        }
+
+        closeSuggestions(fromInput, fromSuggestions);
+        setStatus('Location found. Add a destination and find a route.', 'success');
+      } catch (error) {
+        setStatus('Your location was found, but nearby stations could not be loaded.', 'error');
+        console.error(error);
       }
-
-      if (state.currentMap) {
-        const userMarker = L.circleMarker([latitude, longitude], {
-          radius: 8,
-          color: '#16a34a',
-          fillColor: '#16a34a',
-          fillOpacity: 0.9,
-        }).addTo(state.currentMap);
-        userMarker.bindPopup('<div><strong>Your current location</strong></div>');
-        state.currentMarkers.push(userMarker);
-        state.currentMap.setView([latitude, longitude], 13);
-      }
-
-      syncSuggestions();
-      setStatus('Location found. Searching for nearby route options.', 'success');
-    }, () => {
+    }, (error) => {
       useLocationBtn.disabled = false;
-      useLocationBtn.textContent = 'Use my location';
-      setStatus('Location permission was not granted.', 'error');
+      locationLabel.textContent = 'Use my location';
+      setStatus(error.code === error.PERMISSION_DENIED ? 'Location permission was not granted.' : 'Could not determine your location. Please try again.', 'error');
     }, {
       enableHighAccuracy: true,
       timeout: 10000,
@@ -348,6 +505,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (useLocationBtn) {
     useLocationBtn.addEventListener('click', useUserLocation);
+  }
+
+  if (swapLocationsBtn) {
+    swapLocationsBtn.addEventListener('click', () => {
+      const from = fromInput.value;
+      fromInput.value = toInput.value;
+      toInput.value = from;
+      closeSuggestions(fromInput, fromSuggestions);
+      closeSuggestions(toInput, toSuggestions);
+      fromInput.focus();
+    });
+  }
+
+  if (routeResult) {
+    routeResult.addEventListener('click', (event) => {
+      const routeButton = event.target.closest('[data-route-index]');
+      if (routeButton) focusRouteOnMap(Number(routeButton.dataset.routeIndex));
+    });
+  }
+
+  if (navToggle && mainNav) {
+    navToggle.addEventListener('click', () => {
+      const isOpen = mainNav.classList.toggle('open');
+      navToggle.setAttribute('aria-expanded', String(isOpen));
+      navToggle.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
+    });
   }
 
   initializeHomePage();

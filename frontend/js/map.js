@@ -1,5 +1,12 @@
 (function () {
   const defaultCenter = [9.0227, 38.7468];
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
 
   function buildMap(targetId = 'map') {
     const map = L.map(targetId, {
@@ -24,17 +31,17 @@
       fillOpacity: 0.9,
     }).addTo(map);
 
-    const routeNames = (station.routes || []).map((route) => route.name).join(', ') || 'No route list';
-    const types = (station.transport_types || []).join(', ') || 'Unknown';
+    const routeNames = escapeHtml((station.routes || []).map((route) => route.name).join(', ') || 'No route list');
+    const types = escapeHtml((station.transport_types || []).join(', ') || 'Unknown');
 
     marker.bindPopup(`
       <div>
-        <h3>${popupTitle || station.name}</h3>
+        <h3>${escapeHtml(popupTitle || station.name)}</h3>
         <p><strong>Transport:</strong> ${types}</p>
         <p><strong>Routes:</strong> ${routeNames}</p>
-        <p>${station.address}</p>
+        <p>${escapeHtml(station.address || '')}</p>
         <div>
-          <a href="/station.html?id=${station.id}" class="popup-link">View Details</a>
+          ${station.id != null ? `<a href="/station.html?id=${encodeURIComponent(station.id)}" class="popup-link">View Details</a>` : ''}
           <a href="https://www.google.com/maps/search/?api=1&query=${station.latitude},${station.longitude}" target="_blank" rel="noreferrer" class="popup-link">Get Directions</a>
         </div>
       </div>

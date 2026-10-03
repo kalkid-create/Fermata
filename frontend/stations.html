@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FERMATA | Stations</title>
     <meta name="description" content="Explore Addis Ababa transport stations and nearby routes." />
+    <link rel="icon" type="image/svg+xml" href="assets/fermata-mark.svg" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
     <header class="site-header">
       <div class="container nav-wrap">
-        <a href="/" class="brand"><span class="brand-mark">📍</span><span>FERMATA</span></a>
-        <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
-        <nav class="main-nav" aria-label="Main navigation">
-          <a href="/">Map</a>
+        <a href="/" class="brand"><img class="brand-mark" src="assets/fermata-mark.svg" alt="" width="42" height="42" /><span class="brand-copy"><span class="brand-name">FERMATA</span><span class="brand-tagline">Simple route.</span></span></a>
+        <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mainNav"><span class="menu-lines" aria-hidden="true"></span></button>
+        <nav class="main-nav" id="mainNav" aria-label="Main navigation">
+          <a href="/">Home</a>
           <a href="/stations.html">Stations</a>
           <a href="/routes.html">Routes</a>
           <a href="/about.html">About</a>
@@ -66,13 +67,6 @@
         const list = document.getElementById('stationsList');
         const searchInput = document.getElementById('stationSearch');
         const filters = Array.from(document.querySelectorAll('.transport-filter'));
-        const navToggle = document.querySelector('.nav-toggle');
-        const mainNav = document.querySelector('.main-nav');
-
-        if (navToggle && mainNav) {
-          navToggle.addEventListener('click', () => mainNav.classList.toggle('open'));
-        }
-
         const allStations = (await window.transportApi.getStations()).data || [];
 
         function renderStations(items) {

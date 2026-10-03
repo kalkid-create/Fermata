@@ -4,15 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FERMATA | Station Details</title>
+    <link rel="icon" type="image/svg+xml" href="assets/fermata-mark.svg" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="css/station.css" />
   </head>
   <body>
     <header class="site-header">
       <div class="container nav-wrap">
-        <a href="/" class="brand"><span class="brand-mark">📍</span><span>FERMATA</span></a>
-        <nav class="main-nav" aria-label="Main navigation">
-          <a href="/">Map</a>
+        <a href="/" class="brand"><img class="brand-mark" src="assets/fermata-mark.svg" alt="" width="42" height="42" /><span class="brand-copy"><span class="brand-name">FERMATA</span><span class="brand-tagline">Simple route.</span></span></a>
+        <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mainNav"><span class="menu-lines" aria-hidden="true"></span></button>
+        <nav class="main-nav" id="mainNav" aria-label="Main navigation">
+          <a href="/">Home</a>
           <a href="/stations.html">Stations</a>
           <a href="/routes.html">Routes</a>
           <a href="/about.html">About</a>
@@ -35,7 +37,7 @@
 
     <footer class="site-footer">
       <div class="container footer-wrap">
-        <p>© 2026 Addis Transport Finder</p>
+        <p>FERMATA · Simple route. · © 2026</p>
       </div>
     </footer>
 

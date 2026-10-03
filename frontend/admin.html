@@ -3,14 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin Dashboard</title>
+    <title>FERMATA | Admin</title>
+    <link rel="icon" type="image/svg+xml" href="assets/fermata-mark.svg" />
     <link rel="stylesheet" href="css/admin.css" />
   </head>
   <body>
     <header class="site-header admin-header">
       <div class="container nav-wrap">
-        <a href="/" class="brand"><span class="brand-mark">AT</span><span>Addis Transport Finder</span></a>
-        <nav class="main-nav" aria-label="Admin navigation">
+        <a href="/" class="brand"><img class="brand-mark" src="assets/fermata-mark.svg" alt="" width="42" height="42" /><span class="brand-copy"><span class="brand-name">FERMATA</span><span class="brand-tagline">Simple route.</span></span></a>
+        <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mainNav"><span class="menu-lines" aria-hidden="true"></span></button>
+        <nav class="main-nav" id="mainNav" aria-label="Admin navigation">
           <a href="/">Home</a>
           <a href="/admin.html">Dashboard</a>
         </nav>
@@ -21,15 +23,15 @@
       <div class="container admin-shell">
         <section id="loginPanel" class="auth-card">
           <h1>Admin login</h1>
-          <p class="muted">Demo authentication only. Credentials are checked server-side.</p>
+          <p class="muted">Sign in to manage FERMATA stations and routes.</p>
           <form id="adminLoginForm" class="admin-form">
             <label>
               Username
-              <input type="text" name="username" value="admin" required />
+              <input type="text" name="username" autocomplete="username" required />
             </label>
             <label>
               Password
-              <input type="password" name="password" value="ChangeMe123!" required />
+              <input type="password" name="password" autocomplete="current-password" required />
             </label>
             <button type="submit" class="primary-btn">Log in</button>
           </form>
@@ -85,6 +87,17 @@
     <script>
       window.APP_CONFIG = window.APP_CONFIG || {};
       window.APP_CONFIG.apiBaseUrl = window.APP_CONFIG.apiBaseUrl || 'http://localhost:5000/api';
+    </script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const toggle = document.querySelector('.nav-toggle');
+        const nav = document.getElementById('mainNav');
+        toggle?.addEventListener('click', () => {
+          const isOpen = nav?.classList.toggle('open') || false;
+          toggle.setAttribute('aria-expanded', String(isOpen));
+          toggle.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
+        });
+      });
     </script>
     <script src="js/admin.js"></script>
   </body>
