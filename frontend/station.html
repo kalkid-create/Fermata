@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FERMATA | Station Details</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/station.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container nav-wrap">
+        <a href="/" class="brand"><span class="brand-mark">📍</span><span>FERMATA</span></a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="/">Map</a>
+          <a href="/stations.html">Stations</a>
+          <a href="/routes.html">Routes</a>
+          <a href="/about.html">About</a>
+          <a href="/admin.html">Admin</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="detail-page">
+      <div class="container detail-layout">
+        <article id="stationDetail" class="station-detail-card">
+          <div class="loading-state">Loading station details...</div>
+        </article>
+
+        <aside class="station-map-panel">
+          <div id="stationMap" aria-label="Station location map"></div>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-wrap">
+        <p>© 2026 Addis Transport Finder</p>
+      </div>
+    </footer>
+
+    <script>
+      window.APP_CONFIG = window.APP_CONFIG || {};
+      window.APP_CONFIG.apiBaseUrl = window.APP_CONFIG.apiBaseUrl || 'http://localhost:5000/api';
+    </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/stations.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

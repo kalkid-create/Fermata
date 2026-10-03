@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="css/admin.css" />
+  </head>
+  <body>
+    <header class="site-header admin-header">
+      <div class="container nav-wrap">
+        <a href="/" class="brand"><span class="brand-mark">AT</span><span>Addis Transport Finder</span></a>
+        <nav class="main-nav" aria-label="Admin navigation">
+          <a href="/">Home</a>
+          <a href="/admin.html">Dashboard</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="admin-page">
+      <div class="container admin-shell">
+        <section id="loginPanel" class="auth-card">
+          <h1>Admin login</h1>
+          <p class="muted">Demo authentication only. Credentials are checked server-side.</p>
+          <form id="adminLoginForm" class="admin-form">
+            <label>
+              Username
+              <input type="text" name="username" value="admin" required />
+            </label>
+            <label>
+              Password
+              <input type="password" name="password" value="ChangeMe123!" required />
+            </label>
+            <button type="submit" class="primary-btn">Log in</button>
+          </form>
+          <p id="loginMessage" class="feedback" aria-live="polite"></p>
+        </section>
+
+        <section id="adminDashboard" class="dashboard hidden">
+          <div class="dashboard-grid">
+            <div class="panel">
+              <h2>Add or edit station</h2>
+              <form id="stationForm" class="admin-form">
+                <input type="hidden" name="stationId" />
+                <label>Station name<input type="text" name="name" required /></label>
+                <label>Address<input type="text" name="address" required /></label>
+                <label>Latitude<input type="number" name="latitude" step="0.000001" required /></label>
+                <label>Longitude<input type="number" name="longitude" step="0.000001" required /></label>
+                <label>Description<textarea name="description" rows="3"></textarea></label>
+                <label>Operating hours<input type="text" name="operating_hours" /></label>
+                <div class="checkbox-list" id="stationTypeList"></div>
+                <div class="checkbox-list" id="routeList"></div>
+                <button type="submit" class="primary-btn">Save station</button>
+                <button type="button" id="resetStationForm" class="secondary-btn">Reset</button>
+              </form>
+            </div>
+
+            <div class="panel">
+              <h2>Route manager</h2>
+              <form id="routeForm" class="admin-form">
+                <input type="hidden" name="routeId" />
+                <label>Route name<input type="text" name="name" required /></label>
+                <label>Origin<input type="text" name="origin" required /></label>
+                <label>Destination<input type="text" name="destination" required /></label>
+                <label>Description<textarea name="description" rows="3"></textarea></label>
+                <button type="submit" class="primary-btn">Save route</button>
+                <button type="button" id="resetRouteForm" class="secondary-btn">Reset</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="panel table-panel">
+            <h2>Stations</h2>
+            <div id="stationsTable" class="table-wrap"></div>
+          </div>
+
+          <div class="panel table-panel">
+            <h2>Routes</h2>
+            <div id="routesTable" class="table-wrap"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      window.APP_CONFIG = window.APP_CONFIG || {};
+      window.APP_CONFIG.apiBaseUrl = window.APP_CONFIG.apiBaseUrl || 'http://localhost:5000/api';
+    </script>
+    <script src="js/admin.js"></script>
+  </body>
+</html>

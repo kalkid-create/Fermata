@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FERMATA | Simple Route</title>
+    <meta name="description" content="FERMATA helps you find the right route from one place to another across Addis Ababa." />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container nav-wrap">
+        <a href="/" class="brand">
+          <span class="brand-mark">📍</span>
+          <span>FERMATA</span>
+        </a>
+
+        <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="/">Map</a>
+          <a href="/stations.html">Stations</a>
+          <a href="/routes.html">Routes</a>
+          <a href="/about.html">About</a>
+          <a href="/admin.html">Admin</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container route-shell">
+          <div class="hero-branding">
+            <div class="brand-lockup">
+              <span class="brand-mark large">📍</span>
+              <div>
+                <div class="brand-name">FERMATA</div>
+                <div class="brand-slogan">Simple Route</div>
+              </div>
+            </div>
+          </div>
+
+          <form id="routeSearchForm" class="route-search-form" aria-label="Route search form">
+            <div class="field-group">
+              <label for="fromInput">Where are you starting?</label>
+              <div class="input-wrap">
+                <span class="input-icon">📍</span>
+                <input id="fromInput" list="fromSuggestions" type="search" placeholder="Choose starting point" aria-label="Starting point" />
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="toInput">Where do you want to go?</label>
+              <div class="input-wrap">
+                <span class="input-icon">📍</span>
+                <input id="toInput" list="toSuggestions" type="search" placeholder="Choose destination" aria-label="Destination" />
+              </div>
+            </div>
+
+            <button type="submit" class="primary-btn route-btn">Find Route</button>
+          </form>
+
+          <div class="quick-actions">
+            <button id="useLocationBtn" class="secondary-btn" type="button">Use my location</button>
+          </div>
+
+          <datalist id="fromSuggestions"></datalist>
+          <datalist id="toSuggestions"></datalist>
+
+          <div id="routeStatus" class="route-status" aria-live="polite"></div>
+          <div id="routeResult" class="route-result" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="map-section">
+        <div class="container map-layout">
+          <div class="map-panel">
+            <div class="panel-header">
+              <h2>Route map</h2>
+              <span class="badge">DEMO DATA</span>
+            </div>
+            <div id="map" aria-label="Interactive map of Addis Ababa"></div>
+          </div>
+
+          <aside class="results-panel">
+            <div class="panel-header">
+              <h2>Recommended stations</h2>
+            </div>
+            <div id="stationResults" class="station-results" aria-live="polite"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="popular" class="popular-section">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Popular and nearby stations</h2>
+            <p>Use the map and route search tools to find the most relevant stops for your trip.</p>
+          </div>
+
+          <div id="popularStations" class="popular-grid"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-wrap">
+        <p>© 2026 FERMATA</p>
+        <p>Demo data only for local testing and portfolio use.</p>
+      </div>
+    </footer>
+
+    <script>
+      window.APP_CONFIG = window.APP_CONFIG || {};
+      window.APP_CONFIG.apiBaseUrl = window.APP_CONFIG.apiBaseUrl || 'http://localhost:5000/api';
+    </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/stations.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

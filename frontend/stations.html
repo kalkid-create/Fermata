@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FERMATA | Stations</title>
+    <meta name="description" content="Explore Addis Ababa transport stations and nearby routes." />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container nav-wrap">
+        <a href="/" class="brand"><span class="brand-mark">📍</span><span>FERMATA</span></a>
+        <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="/">Map</a>
+          <a href="/stations.html">Stations</a>
+          <a href="/routes.html">Routes</a>
+          <a href="/about.html">About</a>
+          <a href="/admin.html">Admin</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <section class="container page-header">
+        <div>
+          <p class="section-kicker">Transport network</p>
+          <h1>Stations</h1>
+        </div>
+        <div class="page-actions">
+          <input id="stationSearch" type="search" placeholder="Search stations, areas, routes" aria-label="Search stations" />
+        </div>
+      </section>
+
+      <section class="container station-layout">
+        <aside class="station-panel">
+          <div class="panel-header compact-header">
+            <h2>Filters</h2>
+          </div>
+          <div class="filter-stack">
+            <label><input type="checkbox" value="Minibus" class="transport-filter" /> Minibus</label>
+            <label><input type="checkbox" value="Bus" class="transport-filter" /> Bus</label>
+            <label><input type="checkbox" value="Taxi" class="transport-filter" /> Taxi</label>
+            <label><input type="checkbox" value="Other" class="transport-filter" /> Other</label>
+          </div>
+        </aside>
+
+        <div class="station-results-panel">
+          <div id="stationsList" class="station-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      window.APP_CONFIG = window.APP_CONFIG || {};
+      window.APP_CONFIG.apiBaseUrl = window.APP_CONFIG.apiBaseUrl || 'http://localhost:5000/api';
+    </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/stations.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', async () => {
+        const list = document.getElementById('stationsList');
+        const searchInput = document.getElementById('stationSearch');
+        const filters = Array.from(document.querySelectorAll('.transport-filter'));
+        const navToggle = document.querySelector('.nav-toggle');
+        const mainNav = document.querySelector('.main-nav');
+
+        if (navToggle && mainNav) {
+          navToggle.addEventListener('click', () => mainNav.classList.toggle('open'));
+        }
+
+        const allStations = (await window.transportApi.getStations()).data || [];
+
+        function renderStations(items) {
+          if (!list) return;
+          if (!items.length) {
+            list.innerHTML = '<div class="result-card empty">No transport stations found in this area.</div>';
+            return;
+          }
+
+          list.innerHTML = items.map((station) => `
+            <article class="result-card">
+              <h3>${station.name}</h3>
+              <div class="result-meta">${station.address}</div>
+              <div class="result-meta">${(station.transport_types || []).join(', ') || 'Transport type unavailable'}</div>
+              <div class="result-meta">${(station.destinations || []).join(', ') || 'Popular destinations unavailable'}</div>
+              <div class="result-footer">
+                <a href="/station.html?id=${station.id}">View on map</a>
+                <a href="https://www.google.com/maps/search/?api=1&query=${station.latitude},${station.longitude}" target="_blank" rel="noreferrer">Directions</a>
+              </div>
+            </article>
+          `).join('');
+        }
+
+        function applyFilters() {
+          const query = (searchInput?.value || '').trim().toLowerCase();
+          const activeFilters = filters.filter((box) => box.checked).map((box) => box.value.toLowerCase());
+
+          const filtered = allStations.filter((station) => {
+            const text = [
+              station.name,
+              station.address,
+              ...(station.transport_types || []),
+              ...(station.destinations || []),
+              ...(station.routes || []).flatMap((route) => [route.name, route.origin, route.destination])
+            ].join(' ').toLowerCase();
+
+            const matchesQuery = !query || text.includes(query);
+            const matchesFilters = !activeFilters.length || activeFilters.every((value) =>
+              (station.transport_types || []).some((type) => type.toLowerCase().includes(value))
+            );
+
+            return matchesQuery && matchesFilters;
+          });
+
+          renderStations(filtered);
+        }
+
+        searchInput?.addEventListener('input', applyFilters);
+        filters.forEach((box) => box.addEventListener('change', applyFilters));
+        renderStations(allStations);
+      });
+    </script>
+  </body>
+</html>
