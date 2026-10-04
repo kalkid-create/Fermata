@@ -67,7 +67,27 @@
         const list = document.getElementById('stationsList');
         const searchInput = document.getElementById('stationSearch');
         const filters = Array.from(document.querySelectorAll('.transport-filter'));
-        const allStations = (await window.transportApi.getStations()).data || [];
+        let allStations;
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        })[character]);
+        const directionsUrl = (station) => {
+          const latitude = Number(station.latitude);
+          const longitude = Number(station.longitude);
+          if (station.latitude == null || station.longitude == null || String(station.latitude).trim() === '' || String(station.longitude).trim() === '' ||
+              !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            return null;
+          }
+          const params = new URLSearchParams({ api: '1', query: `${latitude},${longitude}` });
+          return `https://www.google.com/maps/search/?${params.toString()}`;
+        };
+
+        try {
+          allStations = (await window.transportApi.getStations()).data || [];
+        } catch {
+          list.innerHTML = '<div class="result-card empty">Stations could not be loaded. Please try again.</div>';
+          return;
+        }
 
         function renderStations(items) {
           if (!list) return;
@@ -78,13 +98,13 @@
 
           list.innerHTML = items.map((station) => `
             <article class="result-card">
-              <h3>${station.name}</h3>
-              <div class="result-meta">${station.address}</div>
-              <div class="result-meta">${(station.transport_types || []).join(', ') || 'Transport type unavailable'}</div>
-              <div class="result-meta">${(station.destinations || []).join(', ') || 'Popular destinations unavailable'}</div>
+              <h3>${escapeHtml(station.name)}</h3>
+              <div class="result-meta">${escapeHtml(station.address || '')}</div>
+              <div class="result-meta">${escapeHtml((station.transport_types || []).join(', ') || 'Transport type unavailable')}</div>
+              <div class="result-meta">${escapeHtml((station.destinations || []).join(', ') || 'Popular destinations unavailable')}</div>
               <div class="result-footer">
-                <a href="/station.html?id=${station.id}">View on map</a>
-                <a href="https://www.google.com/maps/search/?api=1&query=${station.latitude},${station.longitude}" target="_blank" rel="noreferrer">Directions</a>
+                <a href="/station.html?id=${encodeURIComponent(station.id)}">View on map</a>
+                ${directionsUrl(station) ? `<a href="${directionsUrl(station)}" target="_blank" rel="noopener noreferrer">Directions</a>` : ''}
               </div>
             </article>
           `).join('');

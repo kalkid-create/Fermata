@@ -33,10 +33,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     "'": '&#39;',
   })[character]);
 
-  const hasCoordinates = (place) =>
-    place?.latitude !== null && place?.latitude !== undefined &&
-    place?.longitude !== null && place?.longitude !== undefined &&
-    Number.isFinite(Number(place.latitude)) && Number.isFinite(Number(place.longitude));
+  const hasCoordinates = (place) => {
+    if (place?.latitude === null || place?.latitude === undefined || place?.longitude === null || place?.longitude === undefined) {
+      return false;
+    }
+
+    if (String(place.latitude).trim() === '' || String(place.longitude).trim() === '') {
+      return false;
+    }
+
+    const latitude = Number(place.latitude);
+    const longitude = Number(place.longitude);
+    return Number.isFinite(latitude) && Number.isFinite(longitude) &&
+      latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+  };
+
+  const getDirectionsUrl = (place) => {
+    if (!hasCoordinates(place)) return null;
+    const params = new URLSearchParams({
+      api: '1',
+      query: `${Number(place.latitude)},${Number(place.longitude)}`,
+    });
+    return `https://www.google.com/maps/search/?${params.toString()}`;
+  };
 
   function setStatus(message, type = 'info') {
     if (!routeStatus) return;
@@ -44,26 +63,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     routeStatus.className = `route-status ${type}`;
   }
 
+  function showJourneyFeedback(message, type = 'error', heading = 'Check your journey') {
+    journeySection.hidden = false;
+    searchHint.hidden = true;
+    routeMapPanel.hidden = true;
+    routeResult.innerHTML = `
+      <div class="route-empty ${type === 'error' ? 'route-error' : ''}" role="status">
+        <h3>${escapeHtml(heading)}</h3>
+        <p>${escapeHtml(message)}</p>
+      </div>
+    `;
+    if (resultsBox) resultsBox.innerHTML = '';
+    setStatus(message, type);
+    journeySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function buildSuggestions(query) {
-    const normalized = String(query || '').trim().toLowerCase();
+    const normalized = String(query || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
     if (!normalized) return [];
 
-    const directMatches = state.allStations.filter((station) =>
-      [station.name, station.address].filter(Boolean).join(' ').toLowerCase().includes(normalized)
-    );
-    const matches = directMatches.length ? directMatches : state.allStations.filter((station) => {
-      const searchText = [
-        station.name,
-        station.address,
+    const matches = state.allStations.map((station) => {
+      const name = String(station.name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+      const address = String(station.address || '').toLocaleLowerCase();
+      const otherLocations = [
         ...(station.destinations || []),
         ...(station.routes || []).flatMap((route) => [route.name, route.origin, route.destination]),
-      ].filter(Boolean).join(' ').toLowerCase();
-      return searchText.includes(normalized);
-    });
+      ].filter(Boolean).join(' ').toLocaleLowerCase();
 
-    return [...new Map(matches.map((station) => [station.name, {
+      let score = 0;
+      if (name === normalized) score = 1000;
+      else if (name.startsWith(normalized)) score = 700;
+      else if (name.includes(normalized)) score = 450;
+      else if (address.includes(normalized)) score = 200;
+      else if (otherLocations.includes(normalized)) score = 80;
+
+      return { station, score };
+    }).filter((match) => match.score > 0)
+      .sort((a, b) => b.score - a.score || String(a.station.name).localeCompare(String(b.station.name)));
+
+    return [...new Map(matches.map(({ station }) => [station.name, {
       name: station.name,
-      detail: station.address || (station.transport_types || []).join(' · ') || 'Transport station',
+      detail: [station.address, (station.transport_types || []).join(', ')].filter(Boolean).join(' · ') || 'Transport station',
     }])).values()].slice(0, 6);
   }
 
@@ -147,7 +187,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
         <div class="result-footer">
           <a href="/station.html?id=${encodeURIComponent(station.id)}">View details</a>
-          ${hasCoordinates(station) ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.latitude},${station.longitude}`)}" target="_blank" rel="noreferrer">Directions</a>` : ''}
+          ${getDirectionsUrl(station) ? `<a href="${getDirectionsUrl(station)}" target="_blank" rel="noopener noreferrer">Directions</a>` : ''}
         </div>
       </article>
     `).join('');
@@ -193,6 +233,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="route-options">
         ${data.routes.map((option, index) => {
           const stations = Array.isArray(option.stations) ? option.stations : [];
+          const description = String(option.description || '').trim();
+          const showDescription = description && !/^(demo data|sample data)\b/i.test(description);
           return `
           <article class="route-option">
             <div class="route-option-header">
@@ -202,10 +244,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             <h3>${escapeHtml(option.routeName || `Route ${index + 1}`)}</h3>
             <div class="route-meta">
               <span><svg class="transport-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17V6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5V17M5 10h14M7 20v-3m10 3v-3M7.5 17h9"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>${escapeHtml(option.transportType || 'Transport type unavailable')}</span>
-              <span>${stations.length} ${stations.length === 1 ? 'station' : 'stations'}</span>
+              <span>${stations.length ? `${stations.length} ${stations.length === 1 ? 'station' : 'stations'}` : 'Stop details unavailable'}</span>
             </div>
             ${option.summary ? `<p class="route-summary-text">${escapeHtml(option.summary)}</p>` : ''}
-            ${option.description ? `<p class="route-description">${escapeHtml(option.description)}</p>` : ''}
+            ${showDescription ? `<p class="route-description">${escapeHtml(description)}</p>` : ''}
             <h4 class="stops-heading">Stations along this route</h4>
             ${stations.length ? `
               <ol class="route-stops">
@@ -217,10 +259,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `).join('')}
               </ol>
             ` : '<p class="route-description">Station details are not available for this route yet.</p>'}
-            <button class="view-route-button" type="button" data-route-index="${index}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-              View route on map
-            </button>
+            <div class="route-card-actions">
+              <button class="view-route-button" type="button" data-route-index="${index}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                View route on map
+              </button>
+              ${getDirectionsUrl(data.to) ? `<a class="route-directions-button" href="${getDirectionsUrl(data.to)}" target="_blank" rel="noopener noreferrer" aria-label="Get directions to ${escapeHtml(data.to.label || 'the destination')} in Google Maps"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>Directions</a>` : ''}
+            </div>
           </article>
         `;
         }).join('')}
@@ -256,7 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="result-meta">${escapeHtml(station.routeName || 'Route')} · ${escapeHtml(station.transportType || 'Transport type unavailable')}</div>
         <div class="result-footer">
           ${station.id != null ? `<a href="/station.html?id=${encodeURIComponent(station.id)}">View details</a>` : ''}
-          ${hasCoordinates(station) ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${station.latitude},${station.longitude}`)}" target="_blank" rel="noreferrer">Directions</a>` : ''}
+          ${getDirectionsUrl(station) ? `<a href="${getDirectionsUrl(station)}" target="_blank" rel="noopener noreferrer">Directions</a>` : ''}
         </div>
       </article>
     `).join('');
@@ -374,8 +419,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const to = toInput.value.trim();
 
     if (!from || !to) {
-      setStatus('Please add both a starting point and a destination.', 'error');
-      (from ? toInput : fromInput).focus();
+      const missingInput = from ? toInput : fromInput;
+      missingInput.setCustomValidity(from ? 'Enter a destination.' : 'Enter a starting point.');
+      showJourneyFeedback('Enter both a starting point and a destination to search.', 'error', 'Complete your journey');
+      missingInput.focus();
+      return;
+    }
+
+    const normalizeLocation = (value) => value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    if (normalizeLocation(from) === normalizeLocation(to)) {
+      showJourneyFeedback('Choose two different locations to find a route.', 'error', 'Choose a different destination');
+      toInput.focus();
       return;
     }
 
@@ -384,17 +438,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const submitLabel = submitButton?.querySelector('span');
     if (submitButton) {
       submitButton.disabled = true;
-      submitLabel.textContent = 'Finding route...';
+      submitLabel.textContent = 'Finding the best route...';
     }
     journeySection.hidden = false;
     searchHint.hidden = true;
     routeMapPanel.hidden = true;
-    routeResult.innerHTML = '<div class="route-loading" role="status"><span class="loading-mark-wrap" aria-hidden="true"><img src="assets/fermata-mark.svg" alt="" /></span><span>Finding your route…</span></div>';
+    routeResult.innerHTML = '<div class="route-loading" role="status"><span class="loading-mark-wrap" aria-hidden="true"><img src="assets/fermata-mark.svg" alt="" /></span><span>Finding the best route...</span></div>';
     if (resultsBox) resultsBox.innerHTML = '';
     clearMapLayers();
 
     try {
-      setStatus('Searching available routes…', 'info');
+      setStatus('Finding the best route...', 'info');
       const result = await window.transportApi.searchRoute(from, to);
       if (searchId !== state.searchId) return;
       state.lastResult = result;
@@ -416,12 +470,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="empty-route-illustration" aria-hidden="true">
             <svg viewBox="0 0 64 64"><circle cx="28" cy="28" r="17"/><path d="m41 41 12 12M21 28h14m-7-7v14"/></svg>
           </div>
-          <h3>Route search is temporarily unavailable</h3>
-          <p>Please check your connection and try again in a moment.</p>
+          <h3>Something went wrong</h3>
+          <p>Please try again.</p>
         </div>
       `;
       routeMapPanel.hidden = true;
-      setStatus('Unable to find a route right now. Please try again.', 'error');
+      setStatus('Something went wrong. Please try again.', 'error');
       console.error(error);
       journeySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } finally {
@@ -500,6 +554,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (routeForm) {
+    [fromInput, toInput].forEach((input, index) => {
+      input.addEventListener('input', () => input.setCustomValidity(''));
+      input.addEventListener('invalid', () => {
+        if (!input.value.trim()) {
+          input.setCustomValidity(index === 0 ? 'Enter a starting point.' : 'Enter a destination.');
+        }
+      });
+    });
+
+    routeForm.addEventListener('invalid', (event) => {
+      const missingInput = !fromInput.value.trim() ? fromInput : toInput;
+      const message = missingInput === fromInput ? 'Enter a starting point.' : 'Enter a destination.';
+      showJourneyFeedback(message, 'error', 'Complete your journey');
+    }, true);
     routeForm.addEventListener('submit', handleRouteSearch);
   }
 

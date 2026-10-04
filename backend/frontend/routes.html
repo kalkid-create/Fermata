@@ -49,13 +49,19 @@
       document.addEventListener('DOMContentLoaded', async () => {
         const routesList = document.getElementById('routesList');
 
-        const routes = (await window.transportApi.getRoutes()).data || [];
-
         if (!routesList) return;
 
         const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
           '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
         })[character]);
+
+        let routes;
+        try {
+          routes = (await window.transportApi.getRoutes()).data || [];
+        } catch {
+          routesList.innerHTML = '<div class="result-card empty">Routes could not be loaded. Please try again.</div>';
+          return;
+        }
 
         routesList.innerHTML = routes.map((route) => `
           <article class="result-card route-card">

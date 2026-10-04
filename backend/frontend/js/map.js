@@ -8,6 +8,20 @@
     "'": '&#39;',
   })[character]);
 
+  function getDirectionsUrl(station) {
+    if (station.latitude == null || station.longitude == null) return null;
+    const latitude = Number(station.latitude);
+    const longitude = Number(station.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+        latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 ||
+        String(station.latitude).trim() === '' || String(station.longitude).trim() === '') {
+      return null;
+    }
+
+    const params = new URLSearchParams({ api: '1', query: `${latitude},${longitude}` });
+    return `https://www.google.com/maps/search/?${params.toString()}`;
+  }
+
   function buildMap(targetId = 'map') {
     const map = L.map(targetId, {
       zoomControl: true,
@@ -42,7 +56,7 @@
         <p>${escapeHtml(station.address || '')}</p>
         <div>
           ${station.id != null ? `<a href="/station.html?id=${encodeURIComponent(station.id)}" class="popup-link">View Details</a>` : ''}
-          <a href="https://www.google.com/maps/search/?api=1&query=${station.latitude},${station.longitude}" target="_blank" rel="noreferrer" class="popup-link">Get Directions</a>
+          ${getDirectionsUrl(station) ? `<a href="${getDirectionsUrl(station)}" target="_blank" rel="noopener noreferrer" class="popup-link">Get Directions</a>` : ''}
         </div>
       </div>
     `);
