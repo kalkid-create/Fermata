@@ -15,18 +15,10 @@ const app = express();
 const PORT = Number(process.env.PORT || 5000);
 
 /* =========================================================
-   FIND FRONTEND DIRECTORY
+   FRONTEND DIRECTORY
    ========================================================= */
 
-const possibleFrontendPaths = [
-  path.join(__dirname, '..', 'frontend'),
-  path.join(process.cwd(), 'frontend'),
-  path.join('/app', 'frontend')
-];
-
-const frontendDir =
-  possibleFrontendPaths.find((dir) => fs.existsSync(dir)) ||
-  path.join(__dirname, '..', 'frontend');
+const frontendDir = path.join(__dirname, 'frontend');
 
 console.log('Frontend directory:', frontendDir);
 console.log(
@@ -91,20 +83,6 @@ app.get('/admin.html', (req, res) => {
 });
 
 /* =========================================================
-   ERROR HANDLER
-   ========================================================= */
-
-app.use((err, req, res, next) => {
-  console.error('Server Error:', err);
-
-  res.status(500).json({
-    success: false,
-    message: 'Server error occurred.',
-    error: err.message
-  });
-});
-
-/* =========================================================
    DATABASE CONNECTION
    ========================================================= */
 
@@ -133,15 +111,26 @@ async function initDatabase() {
 
     return client;
   } catch (error) {
-    console.warn(
-      '❌ Neon PostgreSQL connection failed.'
-    );
-
+    console.warn('❌ Neon PostgreSQL connection failed.');
     console.warn(error.message);
 
     return null;
   }
 }
+
+/* =========================================================
+   ERROR HANDLER
+   ========================================================= */
+
+app.use((err, req, res, next) => {
+  console.error('Server Error:', err);
+
+  res.status(500).json({
+    success: false,
+    message: 'Server error occurred.',
+    error: err.message
+  });
+});
 
 /* =========================================================
    START SERVER
@@ -158,7 +147,7 @@ async function startServer() {
 }
 
 /* =========================================================
-   START ONLY WHEN RUN DIRECTLY
+   START APPLICATION
    ========================================================= */
 
 if (require.main === module) {
